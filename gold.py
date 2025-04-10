@@ -1,92 +1,59 @@
-import asyncio
 import requests
-from bs4 import BeautifulSoup
-from telegram import Bot
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-# Thông tin cấu hình
-TELEGRAM_TOKEN = "7693032578:AAHIfmBIzhSklkKgP5VhsVFy8PLioPxj5IQ"
-CHAT_ID = "6998063684"
-
-# Cấu hình proxy
-PROXIES = {
-    "http": "http://118.69.7.30:15604",
-    "https": "http://118.69.7.30:15604"
+# URL API
+api_url = "http://api.btmc.vn/api/BTMCAPI/getpricebtmc"
+api_params = {
+    "key": "3kd8ub1llcg9t45hnoh8hmn7t5kc2v"
 }
 
-# Khởi tạo bot Telegram
-bot = Bot(token=TELEGRAM_TOKEN)
+# Telegram Bot Info
+telegram_bot_token = "7693032578:AAHIfmBIzhSklkKgP5VhsVFy8PLioPxj5IQ"  # Thay bằng mã token của bạn
+telegram_chat_id = "6998063684"  # Thay bằng ID chat hoặc nhóm Telegram của bạn
 
-def get_sjc_price():
-    try:
-        url = "https://sjc.com.vn/"
-        response = requests.get(url, proxies=PROXIES, timeout=10)  # Sử dụng proxy
-        soup = BeautifulSoup(response.text, "html.parser")
+def send_to_telegram(message):
+    """Gửi tin nhắn tới Telegram."""
+    telegram_url = f"https://api.telegram.org/bot{telegram_bot_token}/sendMessage"
+    telegram_params = {
+        "chat_id": telegram_chat_id,
+        "text": message
+    }
+    response = requests.post(telegram_url, data=telegram_params)
+    if response.status_code == 200:
+        print("Tin nhắn đã được gửi đến Telegram.")
+    else:
+        print(f"Lỗi khi gửi tin nhắn: {response.status_code} - {response.text}")
 
-        # Tìm bảng giá vàng
-        table = soup.find("table", class_="sjc-table-show-price")
-        if not table:
-            return "Không tìm thấy bảng giá vàng SJC."
+try:
+    # Gửi yêu cầu GET tới API
+    response = requests.get(api_url, params=api_params)
 
-        rows = table.find_all("tr")
+    if response.status_code == 200:
+        # Xử lý dữ liệu trả về
+        data = response.json()
+        messages = []
 
-        # Tìm giá mua và bán cho "Vàng SJC 1L, 10L, 1KG" tại Hồ Chí Minh
-        for row in rows:
-            cells = row.find_all("td")
-            if len(cells) == 3 and "Vàng SJC 1L, 10L, 1KG" in cells[0].text:
-                price_buy = cells[1].text.strip()
-                price_sell = cells[2].text.strip()
-                return f"Mua: {price_buy} VNĐ, Bán: {price_sell} VNĐ"
+        for row in data.get("data", []):
+            message = (
+                f"Tên vàng: {row.get('n_1')}\n"
+                f"Hàm lượng Kara: {row.get('k_1')}\n"
+                f"Hàm lượng vàng: {row.get('h_1')}\n"
+                f"Giá mua vào: {row.get('pb_1')}\n"
+                f"Giá bán ra: {row.get('ps_1')}\n"
+                f"Giá thế giới: {row.get('pt_1')}\n"
+                f"Thời gian cập nhật: {row.get('d_1')}\n"
+                "----------------------------------------"
+            )
+            messages.append(message)
 
-        return "Không tìm thấy thông tin giá vàng SJC."
-    except Exception as e:
-        return f"Lỗi khi lấy giá vàng SJC: {e}"
+        # Gửi từng tin nhắn tới Telegram
+        for msg in messages:
+            send_to_telegram(msg)
 
-def get_pnj_price():
-    try:
-        url = "https://www.pnj.com.vn/"
-        response = requests.get(url, timeout=10)  # Không sử dụng proxy
-        soup = BeautifulSoup(response.text, "html.parser")
+    else:
+        print(f"Lỗi API: {response.status_code} - {response.text}")
+        send_to_telegram(f"Lỗi API: {response.status_code} - Không thể lấy giá vàng.")
 
-        # Tìm vị trí chứa giá vàng PNJ (cần xác định đúng class từ HTML thực tế)
-        price_buy = soup.find("span", class_="price_buy_class").text.strip()
-        price_sell = soup.find("span", class_="price_sell_class").text.strip()
-
-        return f"Mua: {price_buy} VNĐ, Bán: {price_sell} VNĐ"
-    except Exception as e:
-        return f"Lỗi khi lấy giá vàng PNJ: {e}"
-
-async def send_gold_prices():
-    try:
-        sjc_price = get_sjc_price()
-        pnj_price = get_pnj_price()
-
-        # Soạn nội dung tin nhắn
-        message = f"📈 Giá vàng hôm nay:\n\n"
-        message += f"🏅 SJC:\n{sjc_price}\n\n"
-        message += f"🏅 PNJ:\n{pnj_price}\n"
-
-        # Gửi tin nhắn qua Telegram
-        await bot.send_message(chat_id=CHAT_ID, text=message)
-        print("Đã gửi thông báo Telegram!")
-    except Exception as e:
-        print(f"Lỗi khi gửi tin nhắn: {e}")
-
-async def main():
-    print("Đang lấy giá vàng và gửi thông báo...")
-
-    # Tạo lịch chạy định kỳ
-    scheduler = AsyncIOScheduler()
-    scheduler.add_job(send_gold_prices, 'interval', minutes=5)  # Lặp lại mỗi 5 phút
-
-    # Bắt đầu scheduler trong event loop hiện tại
-    scheduler.start()
-
-    # Giữ chương trình chạy mãi
-    await asyncio.Event().wait()
-
-if __name__ == "__main__":
-    try:
-        asyncio.run(main())  # Sử dụng asyncio.run để khởi động event loop
-    except KeyboardInterrupt:
-        print("Chương trình đã bị hủy.")
+except Exception as e:
+    error_message = f"Có lỗi xảy ra: {e}"
+    print(error_message)
+    send_to_telegram(error_message)
