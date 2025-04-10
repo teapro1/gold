@@ -2,3 +2,4 @@ flask
 requests
 schedule
 apscheduler
+python-telegram-bot==20.3
