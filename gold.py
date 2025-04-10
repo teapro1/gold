@@ -1,7 +1,7 @@
 import asyncio
-import requests
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from telegram import Bot
+import requests
 
 # Cấu hình
 GOLD_API_KEY = "goldapi-1223k519m9b4ams6-io"
