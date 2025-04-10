@@ -1,5 +1,6 @@
+import asyncio
 import requests
-from apscheduler.schedulers.blocking import BlockingScheduler
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from telegram import Bot
 
 # Cấu hình
@@ -16,7 +17,7 @@ GOLD_API_URL = "https://www.goldapi.io/api/XAU/USD"
 # Tạo bot Telegram
 bot = Bot(token=TELEGRAM_TOKEN)
 
-def get_gold_price():
+async def get_gold_price():
     headers = {"x-access-token": GOLD_API_KEY, "Content-Type": "application/json"}
     try:
         response = requests.get(GOLD_API_URL, headers=headers)
@@ -27,24 +28,25 @@ def get_gold_price():
         print(f"Lỗi khi lấy giá vàng: {e}")
         return None
 
-def send_telegram_message(message):
+async def send_telegram_message(message):
     try:
-        bot.send_message(chat_id=CHAT_ID, text=message)
+        await bot.send_message(chat_id=CHAT_ID, text=message)
     except Exception as e:
         print(f"Lỗi khi gửi thông báo Telegram: {e}")
 
-def check_gold_price():
-    price_usd = get_gold_price()
+async def check_gold_price():
+    price_usd = await get_gold_price()
     if price_usd:
         price_vnd = price_usd * EXCHANGE_RATE
         print(f"Giá vàng hiện tại: {price_vnd:,.0f} VNĐ")
         if price_vnd <= TARGET_PRICE_VND:
-            send_telegram_message(f"⚠️ Giá vàng đã giảm xuống: {price_vnd:,.0f} VNĐ!")
+            await send_telegram_message(f"⚠️ Giá vàng đã giảm xuống: {price_vnd:,.0f} VNĐ!")
 
 # Lên lịch
-scheduler = BlockingScheduler()
+scheduler = AsyncIOScheduler()
 scheduler.add_job(check_gold_price, 'interval', minutes=CHECK_INTERVAL_MINUTES)
 
 if __name__ == "__main__":
     print("Dịch vụ đang chạy...")
     scheduler.start()
+    asyncio.get_event_loop().run_forever()
