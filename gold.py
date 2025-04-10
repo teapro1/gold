@@ -42,11 +42,14 @@ async def check_gold_price():
         if price_vnd <= TARGET_PRICE_VND:
             await send_telegram_message(f"⚠️ Giá vàng đã giảm xuống: {price_vnd:,.0f} VNĐ!")
 
-# Lên lịch
-scheduler = AsyncIOScheduler()
-scheduler.add_job(check_gold_price, 'interval', minutes=CHECK_INTERVAL_MINUTES)
+async def main():
+    print("Dịch vụ đang chạy...")
+    scheduler = AsyncIOScheduler()
+    scheduler.add_job(check_gold_price, 'interval', minutes=CHECK_INTERVAL_MINUTES)
+    scheduler.start()
+
+    # Giữ chương trình chạy
+    await asyncio.Event().wait()
 
 if __name__ == "__main__":
-    print("Dịch vụ đang chạy...")
-    scheduler.start()
-    asyncio.get_event_loop().run_forever()
+    asyncio.run(main())
